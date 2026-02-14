@@ -1,0 +1,311 @@
+from flask import Flask, request, redirect, session, send_file, render_template_string
+from werkzeug.security import generate_password_hash, check_password_hash
+import sqlite3, io, math, requests
+
+# ---------- Config ----------
+WEBAPP_DB = "webapp.db"
+
+# Metadata server URL (change to your metadata VM IP if webapp runs elsewhere)
+META_URL = "https://127.0.0.1:5000"
+
+# For now (dev): don't verify certs; later set to path to ca.crt
+META_VERIFY = False
+
+BLOCK_SIZE = 64 * 1024
+REPL_FACTOR = 2
+ADMIN_TOKEN = "admin-secret"
+
+# ---------- App ----------
+app = Flask(__name__)
+app.secret_key = "change-this-secret"
+
+# ---------- DB ----------
+def db():
+    conn = sqlite3.connect(WEBAPP_DB)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    conn = db()
+    conn.execute("""CREATE TABLE IF NOT EXISTS users(
+        username TEXT PRIMARY KEY,
+        password_hash TEXT NOT NULL
+    )""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS uploads(
+        username TEXT NOT NULL,
+        file_id TEXT NOT NULL,
+        filename TEXT NOT NULL,
+        size INTEGER NOT NULL,
+        created REAL DEFAULT (strftime('%s','now')),
+        PRIMARY KEY(username, file_id)
+    )""")
+    conn.commit()
+    conn.close()
+
+def current_user():
+    return session.get("u")
+
+def login_required():
+    return current_user() is not None
+
+# ---------- HTML ----------
+LOGIN_HTML = """
+<h2>Secure DFS Web App</h2>
+{% if msg %}<p style="color:red">{{msg}}</p>{% endif %}
+<form method="post">
+  <input name="username" placeholder="username" required>
+  <input name="password" type="password" placeholder="password" required>
+  <button name="action" value="login">Login</button>
+  <button name="action" value="register">Register</button>
+</form>
+"""
+
+DASH_HTML = """
+<h2>Welcome, {{user}}</h2>
+<p>
+  <a href="/cluster">Cluster Status</a> |
+  <a href="/logout">Logout</a>
+</p>
+<hr>
+<h3>Upload</h3>
+<form method="post" action="/upload" enctype="multipart/form-data">
+  <input type="file" name="file" required>
+  <button>Upload</button>
+</form>
+<hr>
+<h3>Your Files</h3>
+<ul>
+{% for f in files %}
+  <li>
+    {{f["file_id"]}} - {{f["filename"]}} ({{f["size"]}} bytes)
+    [<a href="/download/{{f['file_id']}}">download</a>]
+  </li>
+{% endfor %}
+</ul>
+"""
+
+CLUSTER_HTML = """
+<h2>Cluster Status</h2>
+<p><a href="/">Back</a></p>
+<pre>{{data}}</pre>
+"""
+
+# ---------- Helpers ----------
+def meta_post(path, payload):
+    return requests.post(
+        META_URL + path,
+        json=payload,
+        verify=META_VERIFY,
+        timeout=15
+    )
+
+def meta_get(path, params=None, headers=None):
+    return requests.get(
+        META_URL + path,
+        params=params,
+        headers=headers,
+        verify=META_VERIFY,
+        timeout=15
+    )
+
+def choose_nodes(nodes, block_id):
+    # round-robin replica choice
+    if not nodes:
+        return []
+    picks = []
+    for r in range(REPL_FACTOR):
+        picks.append(nodes[(block_id + r) % len(nodes)])
+    return picks
+
+# ---------- Routes ----------
+@app.get("/")
+def index():
+    if not login_required():
+        return redirect("/login")
+
+    conn = db()
+    files = conn.execute(
+        "SELECT file_id, filename, size FROM uploads WHERE username=? ORDER BY created DESC",
+        (current_user(),)
+    ).fetchall()
+    conn.close()
+
+    return render_template_string(DASH_HTML, user=current_user(), files=files)
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "GET":
+        return render_template_string(LOGIN_HTML, msg=None)
+
+    username = request.form["username"].strip()
+    password = request.form["password"]
+    action = request.form["action"]
+
+    conn = db()
+    row = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
+
+    if action == "register":
+        if row:
+            conn.close()
+            return render_template_string(LOGIN_HTML, msg="User already exists")
+        conn.execute(
+            "INSERT INTO users(username,password_hash) VALUES(?,?)",
+            (username, generate_password_hash(password)),
+        )
+        conn.commit()
+        conn.close()
+        session["u"] = username
+        return redirect("/")
+
+    # action == "login"
+    if not row or not check_password_hash(row["password_hash"], password):
+        conn.close()
+        return render_template_string(LOGIN_HTML, msg="Invalid login")
+
+    conn.close()
+    session["u"] = username
+    return redirect("/")
+
+@app.get("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
+
+@app.post("/upload")
+def upload():
+    if not login_required():
+        return redirect("/login")
+
+    f = request.files.get("file")
+    if not f:
+        return "No file selected", 400
+
+    data = f.read()
+    filename = f.filename or "file.bin"
+    size = len(data)
+
+    # 1) ask metadata to create file_id and return available nodes
+    r = meta_post("/init_upload", {"owner": current_user(), "filename": filename, "size": size})
+    if r.status_code != 200:
+        return f"Metadata init_upload failed: {r.text}", 500
+
+    resp = r.json()
+    if not resp.get("ok", True) and "file_id" not in resp:
+        return f"Metadata init_upload bad response: {resp}", 500
+
+    file_id = resp["file_id"]
+    nodes = resp.get("nodes", [])
+    if not nodes:
+        return "No DataNodes registered in Metadata. Register nodes first.", 500
+
+    # 2) split into blocks and store on chosen datanodes
+    num_blocks = math.ceil(size / BLOCK_SIZE)
+    placements = []
+
+    for block_id in range(num_blocks):
+        chunk = data[block_id*BLOCK_SIZE:(block_id+1)*BLOCK_SIZE]
+        chosen = choose_nodes(nodes, block_id)
+
+        for node in chosen:
+            url = node["url"].rstrip("/") + "/store_block"
+            headers = {"X-NODE-TOKEN": node["node_token"]}
+
+            # For now, store plaintext-as-hex. Later replace with AES ciphertext.
+            payload = {
+                "file_id": file_id,
+                "block_id": str(block_id),
+                "ciphertext": chunk.hex()
+            }
+
+            rr = requests.put(url, json=payload, headers=headers, verify=False, timeout=15)
+            if rr.status_code != 200:
+                return f"Store block failed on {node['node_id']}: {rr.text}", 500
+
+            placements.append({"block_id": block_id, "node_id": node["node_id"]})
+
+    # 3) commit placements to metadata
+    r2 = meta_post("/commit_blocks", {"file_id": file_id, "placements": placements})
+    if r2.status_code != 200:
+        return f"Metadata commit_blocks failed: {r2.text}", 500
+
+    # 4) record file in webapp local list for this user
+    conn = db()
+    conn.execute(
+        "INSERT OR IGNORE INTO uploads(username,file_id,filename,size) VALUES(?,?,?,?)",
+        (current_user(), file_id, filename, size)
+    )
+    conn.commit()
+    conn.close()
+
+    return redirect("/")
+
+@app.get("/download/<file_id>")
+def download(file_id):
+    if not login_required():
+        return redirect("/login")
+
+    # 1) ask metadata where blocks are stored
+    r = meta_get("/file_meta", params={"file_id": file_id})
+    if r.status_code != 200:
+        return f"Metadata file_meta failed: {r.text}", 404
+
+    meta = r.json()
+    if not meta.get("ok", True):
+        return f"Metadata error: {meta}", 404
+
+    blocks = meta["blocks"]      # list of {file_id,block_id,node_id}
+    nodes = meta["nodes"]        # dict node_id -> {node_id,url,node_token,...}
+    filename = meta["file"]["filename"]
+
+    # group node replicas by block_id
+    by_block = {}
+    for b in blocks:
+        by_block.setdefault(b["block_id"], []).append(b["node_id"])
+
+    out = bytearray()
+
+    # 2) fetch blocks in order; try replicas if one node is down
+    for block_id in sorted(by_block.keys()):
+        ok = False
+        for node_id in by_block[block_id]:
+            node = nodes.get(node_id)
+            if not node:
+                continue
+
+            url = node["url"].rstrip("/") + "/read_block"
+            headers = {"X-NODE-TOKEN": node["node_token"]}
+
+            rr = requests.get(
+                url,
+                params={"file_id": file_id, "block_id": str(block_id)},
+                headers=headers,
+                verify=False,
+                timeout=15
+            )
+            if rr.status_code == 200:
+                ct_hex = rr.json()["ciphertext"]
+                out.extend(bytes.fromhex(ct_hex))
+                ok = True
+                break
+
+        if not ok:
+            return f"Failed to read block {block_id} from all replicas", 500
+
+    return send_file(
+        io.BytesIO(out),
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/octet-stream"
+    )
+
+@app.get("/cluster")
+def cluster():
+    if not login_required():
+        return redirect("/login")
+
+    r = meta_get("/nodes", headers={"X-ADMIN-TOKEN": ADMIN_TOKEN})
+    return render_template_string(CLUSTER_HTML, data=r.text)
+
+if __name__ == "__main__":
+    init_db()
+    app.run()

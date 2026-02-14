@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card" style="text-align: center;">
+    <h2>File Shared Successfully!</h2>
+    <p>Share this link with anyone (logged in or not):</p>
+
+    <div style="background: #f0f0f0; padding: 1rem; margin: 1rem 0; word-break: break-all; border-radius: 5px;">
+        <a href="{{ link }}" target="_blank">{{ link }}</a>
+    </div>
+
+    <a href="{{ url_for('dashboard') }}" class="btn">Back to Dashboard</a>
+</div>
+{% endblock %}

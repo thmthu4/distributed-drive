@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <h1>Admin Dashboard</h1>
+    <div
+        style="background-color: #d1fae5; color: #065f46; padding: 0.5rem 1rem; border-radius: 9999px; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+        <span>🔒</span> JWT Security Active
+    </div>
+</div>
+
+<div class="card">
+    <h2>Storage Nodes Status</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Address</th>
+                <th>Status</th>
+                <th>Last Heartbeat</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for node in nodes %}
+            <tr>
+                <td>{{ node.name }}</td>
+                <td>{{ node.address }}</td>
+                <td><span style="color: {{ 'green' if node.status == 'active' else 'red' }}">{{ node.status }}</span>
+                </td>
+                <td>{{ node.last_heartbeat }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h2>File Distribution Inspector</h2>
+    {% if files %}
+    <table>
+        <thead>
+            <tr>
+                <th>Filename</th>
+                <th>Size</th>
+                <th>Owner ID</th>
+                <th>Chunk Distribution</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in files %}
+            <tr>
+                <td>{{ item.metadata.filename }}</td>
+                <td>{{ item.metadata.size }} bytes</td>
+                <td>{{ item.metadata.user_id }}</td>
+                <td>
+                    <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                        {% for chunk in item.chunks %}
+                        <div title="Chunk {{ chunk.sequence }} on {{ chunk.node_name }}"
+                            style="width: 20px; height: 20px; background-color: var(--primary-color); 
+                                        border-radius: 4px; border: 1px solid var(--secondary-color);
+                                        cursor: help; display: flex; align-items: center; justify-content: center; color: white; font-size: 10px;">
+                            {{ chunk.sequence }}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <small style="color: #6b7280; font-size: 0.8rem;">
+                        {{ item.chunks|length }} chunk(s) across {{
+                        item.chunks|map(attribute='node_name')|unique|list|length }} node(s)
+                    </small>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No files in the system.</p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2>Registered Users</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Username</th>
+                <th>Is Admin</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td>{{ user.id }}</td>
+                <td>{{ user.username }}</td>
+                <td>{{ 'Yes' if user.is_admin else 'No' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

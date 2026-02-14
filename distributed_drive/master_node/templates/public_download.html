@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card" style="text-align: center; max-width: 500px; margin: 4rem auto;">
+    <div class="file-icon">📄</div>
+    <h2>{{ file.filename }}</h2>
+    <p>Size: {{ file.size }} bytes</p>
+    <p>Shared by user ID: {{ file.user_id }}</p>
+
+    <a href="{{ url_for('public_download_action', file_id=file.id) }}" class="btn btn-primary"
+        style="margin-top: 1rem;">Download File</a>
+</div>
+{% endblock %}

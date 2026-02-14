@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  master:
+    build: .
+    environment:
+      - SERVICE_TYPE=master
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data/metadata:/app/distributed_drive/master_node
+    networks:
+      - drive-net
+
+  storage1:
+    build: .
+    environment:
+      - SERVICE_TYPE=storage
+      - PORT=5001
+      - MASTER_URL=http://master:5000
+      - PUBLIC_HOST=${PUBLIC_HOST:-localhost}
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./data/storage1:/app/data_5001
+    depends_on:
+      - master
+    networks:
+      - drive-net
+
+  storage2:
+    build: .
+    environment:
+      - SERVICE_TYPE=storage
+      - PORT=5002
+      - MASTER_URL=http://master:5000
+      - PUBLIC_HOST=${PUBLIC_HOST:-localhost}
+    ports:
+      - "5002:5002"
+    volumes:
+      - ./data/storage2:/app/data_5002
+    depends_on:
+      - master
+    networks:
+      - drive-net
+
+networks:
+  drive-net:

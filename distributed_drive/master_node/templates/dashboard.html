@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card">
+    <h2>Upload File</h2>
+    <form action="{{ url_for('upload_file') }}" method="POST" enctype="multipart/form-data">
+        <input type="file" name="file" required class="form-group">
+        <button type="submit" class="btn">Upload</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Your Files</h2>
+    {% if files %}
+    <table>
+        <thead>
+            <tr>
+                <th>Filename</th>
+                <th>Size (bytes)</th>
+                <th>Uploaded At</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for file in files %}
+            <tr>
+                <td>{{ file.filename }}</td>
+                <td>{{ file.size }}</td>
+                <td>{{ file.uploaded_at }}</td>
+                <td>
+                    <a href="{{ url_for('download_file_route', file_id=file.id) }}" class="btn">Download</a>
+                    <a href="{{ url_for('share_file', file_id=file.id) }}" class="btn"
+                        style="background-color: var(--secondary-color);">Share</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No files uploaded yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

@@ -59,6 +59,19 @@ def upload_file():
 def download_file(filename):
     return send_from_directory(DATA_DIR, filename)
 
+@app.route('/delete/<filename>', methods=['DELETE'])
+@require_token('delete')
+def delete_file(filename):
+    file_path = os.path.join(DATA_DIR, filename)
+    if os.path.exists(file_path):
+        try:
+            os.remove(file_path)
+            return jsonify({'status': 'deleted'}), 200
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    else:
+        return jsonify({'error': 'File not found'}), 404
+
 def register_self():
     master_url = os.environ.get('MASTER_URL')
     public_host = os.environ.get('PUBLIC_HOST')

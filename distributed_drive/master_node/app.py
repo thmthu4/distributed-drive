@@ -263,6 +263,53 @@ def public_download_action(file_id):
     return Response(stream_with_context(generate_file_stream(file_id)), 
                    headers={'Content-Disposition': f'attachment; filename=shared_download_{file_id}'})
 
+@app.route('/delete_file/<int:file_id>', methods=['POST'])
+def delete_file(file_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+    
+    # 1. Check ownership
+    file = conn.execute('SELECT * FROM files WHERE id = ?', (file_id,)).fetchone()
+    if not file:
+        conn.close()
+        return "File not found"
+        
+    if file['user_id'] != session['user_id'] and not session.get('is_admin'):
+        conn.close()
+        return "Permission denied"
+
+    # 2. Get Chunks
+    chunks = conn.execute('''
+        SELECT c.chunk_id, s.address 
+        FROM chunks c 
+        JOIN storage_nodes s ON c.storage_node_id = s.id 
+        WHERE c.file_id = ?
+    ''', (file_id,)).fetchall()
+    
+    # 3. Delete from Storage Nodes
+    token = generate_token('delete')
+    errors = []
+    
+    for chunk in chunks:
+        try:
+            requests.delete(f"{chunk['address']}/delete/{chunk['chunk_id']}?token={token}")
+        except Exception as e:
+            errors.append(str(e))
+            # Continue deleting others even if one fails
+    
+    # 4. Delete Metadata
+    conn.execute('DELETE FROM chunks WHERE file_id = ?', (file_id,))
+    conn.execute('DELETE FROM files WHERE id = ?', (file_id,))
+    conn.commit()
+    conn.close()
+    
+    if errors:
+        print(f"Warnings during delete: {errors}")
+        
+    return redirect(url_for('dashboard'))
+
 # --- API for Storage Nodes ---
 @app.route('/api/register_node', methods=['POST'])
 def register_node():

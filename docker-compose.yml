@@ -5,10 +5,11 @@ services:
     build: .
     environment:
       - SERVICE_TYPE=master
+      - DB_FOLDER=/app/data
     ports:
       - "5000:5000"
     volumes:
-      - ./data/metadata:/app/distributed_drive/master_node
+      - ./data/metadata:/app/data
     networks:
       - drive-net
 

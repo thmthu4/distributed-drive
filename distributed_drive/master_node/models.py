@@ -1,7 +1,9 @@
 import sqlite3
 import os
 
-DB_PATH = 'metadata.db'
+# Allow DB path to be configured via Env Var (important for Docker)
+DB_FOLDER = os.environ.get('DB_FOLDER', '.')
+DB_PATH = os.path.join(DB_FOLDER, 'metadata.db')
 
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH, timeout=10) # Increase timeout

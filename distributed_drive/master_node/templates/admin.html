@@ -44,6 +44,7 @@
                 <th>Size</th>
                 <th>Owner ID</th>
                 <th>Chunk Distribution</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -67,6 +68,13 @@
                         {{ item.chunks|length }} chunk(s) across {{
                         item.chunks|map(attribute='node_name')|unique|list|length }} node(s)
                     </small>
+                </td>
+                <td>
+                    <form action="{{ url_for('delete_file', file_id=item.metadata.id) }}" method="POST"
+                        onsubmit="return confirm('Are you sure the admin should delete this file?');">
+                        <button type="submit"
+                            style="background-color: #ef4444; color: white; padding: 0.25rem 0.5rem; border: none; border-radius: 4px; cursor: pointer;">Delete</button>
+                    </form>
                 </td>
             </tr>
             {% endfor %}

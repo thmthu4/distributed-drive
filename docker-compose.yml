@@ -6,6 +6,7 @@ services:
     environment:
       - SERVICE_TYPE=master
       - DB_FOLDER=/app/data
+      - NODE_REGISTRATION_KEY=${NODE_REGISTRATION_KEY:-default_cluster_secret}
     ports:
       - "5000:5000"
     volumes:
@@ -20,6 +21,7 @@ services:
       - PORT=5001
       - MASTER_URL=http://master:5000
       - PUBLIC_HOST=${PUBLIC_HOST:-localhost}
+      - NODE_REGISTRATION_KEY=${NODE_REGISTRATION_KEY:-default_cluster_secret}
     ports:
       - "5001:5001"
     volumes:
@@ -36,6 +38,7 @@ services:
       - PORT=5002
       - MASTER_URL=http://master:5000
       - PUBLIC_HOST=${PUBLIC_HOST:-localhost}
+      - NODE_REGISTRATION_KEY=${NODE_REGISTRATION_KEY:-default_cluster_secret}
     ports:
       - "5002:5002"
     volumes:

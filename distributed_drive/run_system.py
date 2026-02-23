@@ -36,9 +36,10 @@ def run_system():
 
         # Register Storage Nodes with Master
         try:
-            requests.post('http://localhost:5000/api/register_node', json={'name': 'Node 1', 'address': 'http://localhost:5001'})
+            key = os.environ.get('NODE_REGISTRATION_KEY', 'default_cluster_secret')
+            requests.post('http://localhost:5000/api/register_node', json={'name': 'Node 1', 'address': 'http://localhost:5001', 'node_key': key})
             print("Registered Node 1")
-            requests.post('http://localhost:5000/api/register_node', json={'name': 'Node 2', 'address': 'http://localhost:5002'})
+            requests.post('http://localhost:5000/api/register_node', json={'name': 'Node 2', 'address': 'http://localhost:5002', 'node_key': key})
             print("Registered Node 2")
         except Exception as e:
             print(f"Failed to register nodes: {e}")

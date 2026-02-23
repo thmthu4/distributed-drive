@@ -5,6 +5,7 @@ import requests
 import jwt
 import datetime
 import uuid
+import hashlib
 from models import get_db_connection, init_db
 
 app = Flask(__name__)
@@ -170,11 +171,15 @@ def upload_file():
             if not chunk_data:
                 break
             
+            chunk_hash = hashlib.sha256(chunk_data).hexdigest()
             chunk_size = len(chunk_data)
             total_size += chunk_size
             
-            # Select Node (Round Robin)
-            node = nodes[sequence % len(nodes)]
+            # Select up to 2 Nodes for Replication
+            selected_nodes = []
+            for i in range(min(2, len(nodes))):
+                node = nodes[(sequence + i) % len(nodes)]
+                selected_nodes.append(node)
             
             # Generate Chunk ID
             chunk_id = f"{file_id}_{sequence}_{uuid.uuid4().hex}"
@@ -182,22 +187,28 @@ def upload_file():
             # Generate Token
             token = generate_token('upload')
             
-            # Send to Node
-            files = {'file': (chunk_id, chunk_data, 'application/octet-stream')}
-            data = {'filename': chunk_id, 'token': token}
+            successful_replicas = 0
+            last_error = None
+            # Send to Nodes
+            for node in selected_nodes:
+                files = {'file': (chunk_id, chunk_data, 'application/octet-stream')}
+                data = {'filename': chunk_id, 'token': token}
+                
+                try:
+                    response = requests.post(f"{node['address']}/upload", files=files, data=data)
+                    response.raise_for_status()
+                    
+                    # Record Chunk
+                    conn.execute('INSERT INTO chunks (file_id, sequence, storage_node_id, chunk_id, checksum) VALUES (?, ?, ?, ?, ?)',
+                                 (file_id, sequence, node['id'], chunk_id, chunk_hash))
+                    successful_replicas += 1
+                except Exception as e:
+                    print(f"Warning: Failed to upload replica to {node['name']}: {e}")
+                    last_error = str(e)
             
-            # Release DB connection during network call? 
-            # Ideally yes, but we are inside a route. 
-            # Valid because we committed above.
-            
-            response = requests.post(f"{node['address']}/upload", files=files, data=data)
-            
-            if response.status_code != 200:
-                raise Exception(f"Failed to upload chunk {sequence} to {node['name']}: {response.text}")
-            
-            # Record Chunk
-            conn.execute('INSERT INTO chunks (file_id, sequence, storage_node_id, chunk_id) VALUES (?, ?, ?, ?)',
-                         (file_id, sequence, node['id'], chunk_id))
+            if successful_replicas == 0:
+                raise Exception(f"Failed to upload chunk {sequence} to ANY node. Last error: {last_error}")
+                
             conn.commit() # Commit each chunk
             
             sequence += 1
@@ -225,7 +236,7 @@ def download_file_route(file_id):
 def generate_file_stream(file_id):
     conn = get_db_connection()
     chunks = conn.execute('''
-        SELECT c.chunk_id, s.address 
+        SELECT c.chunk_id, s.address, c.checksum, c.sequence 
         FROM chunks c 
         JOIN storage_nodes s ON c.storage_node_id = s.id 
         WHERE c.file_id = ? 
@@ -233,14 +244,46 @@ def generate_file_stream(file_id):
     ''', (file_id,)).fetchall()
     conn.close()
     
+    # Group replicas by sequence
+    from collections import defaultdict
+    replicas_by_seq = defaultdict(list)
+    for row in chunks:
+        replicas_by_seq[row['sequence']].append(row)
+    
     token = generate_token('download')
     
-    for chunk in chunks:
-        # Fetch chunk from storage node
-        url = f"{chunk['address']}/download/{chunk['chunk_id']}?token={token}"
-        with requests.get(url, stream=True) as r:
-            for data in r.iter_content(chunk_size=4096):
-                yield data
+    for seq in sorted(replicas_by_seq.keys()):
+        replicas = replicas_by_seq[seq]
+        success = False
+        
+        for chunk in replicas:
+            url = f"{chunk['address']}/download/{chunk['chunk_id']}?token={token}"
+            expected_hash = chunk['checksum']
+            chunk_buffer = bytearray()
+            
+            try:
+                with requests.get(url, stream=True, timeout=5) as r:
+                    r.raise_for_status()
+                    for data in r.iter_content(chunk_size=4096):
+                        if expected_hash:
+                            chunk_buffer.extend(data)
+                        else:
+                            yield data
+                            
+                if expected_hash:
+                    actual_hash = hashlib.sha256(chunk_buffer).hexdigest()
+                    if actual_hash != expected_hash:
+                        raise Exception(f"Integrity check failed for {chunk['chunk_id']}")
+                    yield bytes(chunk_buffer)
+                    
+                success = True
+                break # Mvoe to next sequence if successful
+                
+            except Exception as e:
+                print(f"Warning: Failed to fetch chunk {seq} replica from {chunk['address']}: {e}")
+                
+        if not success:
+            raise Exception(f"Download failed: Exhausted all replicas for chunk {seq}")
 
 @app.route('/share/<int:file_id>')
 def share_file(file_id):
@@ -316,7 +359,15 @@ def register_node():
     data = request.json
     name = data.get('name')
     address = data.get('address')
+    node_key = data.get('node_key')
     
+    expected_key = os.environ.get('NODE_REGISTRATION_KEY', 'default_cluster_secret')
+    if node_key != expected_key:
+        return jsonify({'error': 'Unauthorized node'}), 403
+        
+    if not name or not address:
+        return jsonify({'error': 'Missing data'}), 400
+        
     conn = get_db_connection()
     try:
         conn.execute('INSERT INTO storage_nodes (name, address) VALUES (?, ?) ON CONFLICT(address) DO UPDATE SET last_heartbeat=CURRENT_TIMESTAMP', (name, address))

@@ -47,7 +47,7 @@ def run_test():
         files = {'file': (filename, f, 'application/octet-stream')}
         res = session.post(f'{BASE_URL}/upload', files=files)
     
-    if res.status_code == 200 and 'redirected' in res.history[0].text.lower() or 'Dashboard' in res.text:
+    if len(res.history) > 0 and 'redirected' in res.history[0].text.lower() or 'Dashboard' in res.text:
          print("PASS: Upload successful (Master accepted it)")
     else:
          print(f"FAIL: Upload failed. {res.status_code}")

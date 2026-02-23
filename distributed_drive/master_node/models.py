@@ -53,6 +53,7 @@ def init_db():
                 sequence INTEGER NOT NULL,
                 storage_node_id INTEGER NOT NULL,
                 chunk_id TEXT NOT NULL,
+                checksum TEXT,
                 FOREIGN KEY (file_id) REFERENCES files (id),
                 FOREIGN KEY (storage_node_id) REFERENCES storage_nodes (id)
             );

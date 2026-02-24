@@ -12,7 +12,7 @@ SECRET_KEY = 'supersecretkey'  # Must match Master Node
 
 # Get port from command line args or default to 5001
 port = int(sys.argv[1]) if len(sys.argv) > 1 else 5001
-DATA_DIR = f'data_{port}'
+DATA_DIR = os.path.abspath(f'data_{port}')
 
 app = Flask(__name__)
 

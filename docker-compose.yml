@@ -59,5 +59,20 @@ services:
     networks:
       - drive-net
 
+  storage4:
+    build: .
+    environment:
+      - SERVICE_TYPE=storage
+      - PORT=5004
+      - MASTER_URL=${MASTER_URL:-http://master:5000}
+      - NODE_IP=${NODE_IP:-127.0.0.1}
+      - NODE_REGISTRATION_KEY=${NODE_REGISTRATION_KEY:-default_cluster_secret}
+    ports:
+      - "5004:5004"
+    volumes:
+      - ./data/storage4:/app/data_5004
+    networks:
+      - drive-net
+
 networks:
   drive-net:

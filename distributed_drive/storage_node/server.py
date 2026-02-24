@@ -94,19 +94,19 @@ def register_self():
         'node_key': node_key
     }
     
-    print(f"Attempting to register with Master at {master_url}...")
-    for i in range(10):
+    print(f"Starting continuous registration with Master at {master_url}...")
+    while True:
         try:
-            resp = requests.post(f"{master_url}/api/register_node", json=payload)
+            resp = requests.post(f"{master_url}/api/register_node", json=payload, timeout=5)
             if resp.status_code == 200:
-                print(f"Successfully registered as {lan_address}")
-                break
+                print(f"Heartbeat: Successfully registered/updated as {lan_address}")
             else:
-                print(f"Registration rejected: {resp.text}")
-                time.sleep(5)
+                print(f"Heartbeat: Registration rejected: {resp.text}")
         except Exception as e:
-            print(f"Registration failed (attempt {i+1}): {e}")
-            time.sleep(5)
+            print(f"Heartbeat: Registration failed: {e}")
+        
+        # Ping again every 30 seconds to keep node 'active'
+        time.sleep(30)
 
 if __name__ == '__main__':
     # Start registration in background if env vars exist

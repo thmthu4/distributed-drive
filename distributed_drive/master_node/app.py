@@ -378,6 +378,19 @@ def register_node():
         conn.close()
     return jsonify({'status': 'registered'})
 
+@app.route('/api/nodes', methods=['GET'])
+def get_nodes():
+    conn = get_db_connection()
+    try:
+        nodes = conn.execute('SELECT name, address, status, last_heartbeat FROM storage_nodes').fetchall()
+        # Convert sqlite3.Row to dict
+        nodes_list = [dict(node) for node in nodes]
+        return jsonify({'nodes': nodes_list})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
 if __name__ == '__main__':
     # Listen on all interfaces for Docker
     app.run(host='0.0.0.0', port=5000, debug=True)

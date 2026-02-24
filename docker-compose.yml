@@ -48,5 +48,22 @@ services:
     networks:
       - drive-net
 
+  storage3:
+    build: .
+    environment:
+      - SERVICE_TYPE=storage
+      - PORT=5003
+      - MASTER_URL=http://master:5000
+      - PUBLIC_HOST=${PUBLIC_HOST:-localhost}
+      - NODE_REGISTRATION_KEY=${NODE_REGISTRATION_KEY:-default_cluster_secret}
+    ports:
+      - "5003:5003"
+    volumes:
+      - ./data/storage3:/app/data_5003
+    depends_on:
+      - master
+    networks:
+      - drive-net
+
 networks:
   drive-net:

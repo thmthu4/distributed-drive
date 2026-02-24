@@ -31,6 +31,8 @@
                     <a href="{{ url_for('download_file_route', file_id=file.id) }}" class="btn">Download</a>
                     <a href="{{ url_for('share_file', file_id=file.id) }}" class="btn"
                         style="background-color: var(--secondary-color);">Share</a>
+                    <a href="{{ url_for('debug_file', file_id=file.id) }}" class="btn"
+                        style="background-color: #f59e0b; color: white;">Debug (0 bytes? Click here)</a>
                 </td>
             </tr>
             {% endfor %}

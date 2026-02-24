@@ -306,6 +306,46 @@ def generate_file_stream(file_id):
         if not success:
             raise Exception(f"Download failed: Exhausted all replicas for chunk {seq}")
 
+@app.route('/debug_file/<int:file_id>')
+def debug_file(file_id):
+    if 'user_id' not in session and not session.get('is_admin'):
+        return "Access denied"
+
+    conn = get_db_connection()
+    chunks = conn.execute('''
+        SELECT c.chunk_id, s.address, c.checksum, c.sequence 
+        FROM chunks c 
+        JOIN storage_nodes s ON c.storage_node_id = s.id 
+        WHERE c.file_id = ? 
+        ORDER BY c.sequence
+    ''', (file_id,)).fetchall()
+    conn.close()
+    
+    logs = [f"<h1>Debug Network Trace for File ID {file_id}</h1><hr>"]
+    token = generate_token('download')
+    
+    for chunk in chunks:
+        url = f"{chunk['address']}/download/{chunk['chunk_id']}?token={token}"
+        logs.append(f"<b>[Chunk {chunk['sequence']}]</b> Requesting from <a href='{url}'>{chunk['address']}</a>")
+        try:
+            r = requests.get(url, stream=True, timeout=5)
+            logs.append(f"-> HTTP Status: <code>{r.status_code}</code>")
+            if r.status_code == 200:
+                data = r.raw.read()
+                logs.append(f"-> Read <b>{len(data)}</b> bytes of raw TCP stream. Expected hash: <code>{chunk['checksum']}</code>")
+                actual_hash = hashlib.sha256(data).hexdigest()
+                logs.append(f"-> Actual hash: <code>{actual_hash}</code>")
+                if actual_hash == chunk['checksum']:
+                    logs.append("-> <span style='color:green;'><b>Hash Match: YES (Success)</b></span><br>")
+                else:
+                    logs.append("-> <span style='color:red;'><b>Hash Match: NO (Integrity Error)</b></span><br>")
+            else:
+                logs.append(f"-> <span style='color:red;'><b>Error text: {r.text}</b></span><br>")
+        except Exception as e:
+            logs.append(f"-> <span style='color:red;'><b>Network Exception: {str(e)}</b></span><br>")
+            
+    return "<br>".join(logs)
+
 @app.route('/share/<int:file_id>')
 def share_file(file_id):
     if 'user_id' not in session:

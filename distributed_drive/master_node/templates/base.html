@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,27 +8,49 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
+
 <body>
     <header>
         <nav>
             <a href="/" class="logo">Distributed Drive</a>
             <div class="nav-links">
                 {% if session.user_id %}
-                    <a href="{{ url_for('dashboard') }}">Dashboard</a>
-                    {% if session.is_admin %}
-                        <a href="{{ url_for('admin') }}">Admin</a>
-                    {% endif %}
-                    <a href="{{ url_for('logout') }}">Logout ({{ session.username }})</a>
+                <a href="{{ url_for('dashboard') }}" class="nav-btn">📁 My Drive</a>
+                {% if session.is_admin %}
+                <a href="{{ url_for('admin') }}" class="nav-btn">⚙️ Admin Panel</a>
+                {% endif %}
+                <a href="{{ url_for('logout') }}" class="nav-btn logout-btn">🚪 Logout ({{ session.username }})</a>
                 {% else %}
-                    <a href="{{ url_for('login') }}">Login</a>
-                    <a href="{{ url_for('register') }}">Register</a>
+                <a href="{{ url_for('login') }}">Login</a>
+                <a href="{{ url_for('register') }}">Register</a>
                 {% endif %}
             </div>
         </nav>
     </header>
 
-    <div class="container">
+    <div class="container main-content">
         {% block content %}{% endblock %}
     </div>
+
+    <script>
+        // Auto-convert UTC timestamps from database to the user's Local Timezone
+        document.addEventListener('DOMContentLoaded', () => {
+            const timeElements = document.querySelectorAll('.local-time');
+            timeElements.forEach(el => {
+                const utcStr = el.getAttribute('data-utc');
+                if (utcStr && utcStr !== 'None') {
+                    // SQLite saves as YYYY-MM-DD HH:MM:SS, adding 'Z' forces it to parse as UTC
+                    const d = new Date(utcStr.replace(' ', 'T') + 'Z');
+                    if (!isNaN(d)) {
+                        el.textContent = d.toLocaleString(undefined, {
+                            year: 'numeric', month: 'short', day: 'numeric',
+                            hour: '2-digit', minute: '2-digit', second: '2-digit'
+                        });
+                    }
+                }
+            });
+        });
+    </script>
 </body>
+
 </html>

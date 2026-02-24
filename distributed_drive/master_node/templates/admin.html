@@ -27,7 +27,7 @@
                 <td>{{ node.address }}</td>
                 <td><span style="color: {{ 'green' if node.status == 'active' else 'red' }}">{{ node.status }}</span>
                 </td>
-                <td>{{ node.last_heartbeat }}</td>
+                <td class="local-time" data-utc="{{ node.last_heartbeat }}">{{ node.last_heartbeat }}</td>
             </tr>
             {% endfor %}
         </tbody>

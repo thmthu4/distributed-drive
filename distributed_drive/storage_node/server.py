@@ -25,14 +25,19 @@ def require_token(action):
         def wrapper(*args, **kwargs):
             token = request.args.get('token') or request.form.get('token')
             if not token:
+                print("Auth Error: Missing token")
                 return jsonify({'error': 'Missing token'}), 401
             try:
-                payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+                # Allow a generous leeway (24 hours = 86400 seconds) because physical LAN devices often have unsynced clocks.
+                payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'], leeway=86400)
                 if payload.get('action') != action:
+                    print(f"Auth Error: Invalid action {payload.get('action')}")
                     return jsonify({'error': 'Invalid token action'}), 403
-            except jwt.ExpiredSignatureError:
+            except jwt.ExpiredSignatureError as e:
+                print(f"Auth Error: Token expired (Check clock drift!) - {e}")
                 return jsonify({'error': 'Token expired'}), 401
-            except jwt.InvalidTokenError:
+            except jwt.InvalidTokenError as e:
+                print(f"Auth Error: Invalid token - {e}")
                 return jsonify({'error': 'Invalid token'}), 401
             return f(*args, **kwargs)
         return wrapper

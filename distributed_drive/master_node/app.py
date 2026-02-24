@@ -6,6 +6,7 @@ import jwt
 import datetime
 import uuid
 import hashlib
+import mimetypes
 from models import get_db_connection, init_db
 
 app = Flask(__name__)
@@ -229,9 +230,20 @@ def download_file_route(file_id):
     if 'user_id' not in session:
         return redirect(url_for('login'))
     
-    # Stream the file back to consumer
+    conn = get_db_connection()
+    file_info = conn.execute('SELECT * FROM files WHERE id = ?', (file_id,)).fetchone()
+    conn.close()
+    
+    if not file_info:
+        return "File not found", 404
+        
+    mimetype = mimetypes.guess_type(file_info['filename'])[0] or 'application/octet-stream'
+    
     return Response(stream_with_context(generate_file_stream(file_id)), 
-                   headers={'Content-Disposition': f'attachment; filename=download_{file_id}'})
+                   headers={
+                       'Content-Disposition': f'attachment; filename="{file_info["filename"]}"',
+                       'Content-Type': mimetype
+                   })
 
 def generate_file_stream(file_id):
     conn = get_db_connection()
@@ -303,8 +315,20 @@ def shared_file_view(file_id):
 
 @app.route('/public_download/<int:file_id>')
 def public_download_action(file_id):
+    conn = get_db_connection()
+    file_info = conn.execute('SELECT * FROM files WHERE id = ?', (file_id,)).fetchone()
+    conn.close()
+    
+    if not file_info:
+        return "File not found", 404
+        
+    mimetype = mimetypes.guess_type(file_info['filename'])[0] or 'application/octet-stream'
+        
     return Response(stream_with_context(generate_file_stream(file_id)), 
-                   headers={'Content-Disposition': f'attachment; filename=shared_download_{file_id}'})
+                   headers={
+                       'Content-Disposition': f'attachment; filename="{file_info["filename"]}"',
+                       'Content-Type': mimetype
+                   })
 
 @app.route('/delete_file/<int:file_id>', methods=['POST'])
 def delete_file(file_id):

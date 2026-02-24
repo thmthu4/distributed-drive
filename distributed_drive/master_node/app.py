@@ -375,7 +375,7 @@ def delete_file(file_id):
     if errors:
         print(f"Warnings during delete: {errors}")
         
-    return redirect(url_for('dashboard'))
+    return redirect(request.referrer or url_for('dashboard'))
 
 # --- API for Storage Nodes ---
 @app.route('/api/register_node', methods=['POST'])

@@ -19,15 +19,13 @@ services:
     environment:
       - SERVICE_TYPE=storage
       - PORT=5001
-      - MASTER_URL=http://master:5000
+      - MASTER_URL=${MASTER_URL:-http://master:5000}
       - NODE_IP=${NODE_IP:-127.0.0.1}
       - NODE_REGISTRATION_KEY=${NODE_REGISTRATION_KEY:-default_cluster_secret}
     ports:
       - "5001:5001"
     volumes:
       - ./data/storage1:/app/data_5001
-    depends_on:
-      - master
     networks:
       - drive-net
 
@@ -36,15 +34,13 @@ services:
     environment:
       - SERVICE_TYPE=storage
       - PORT=5002
-      - MASTER_URL=http://master:5000
+      - MASTER_URL=${MASTER_URL:-http://master:5000}
       - NODE_IP=${NODE_IP:-127.0.0.1}
       - NODE_REGISTRATION_KEY=${NODE_REGISTRATION_KEY:-default_cluster_secret}
     ports:
       - "5002:5002"
     volumes:
       - ./data/storage2:/app/data_5002
-    depends_on:
-      - master
     networks:
       - drive-net
 
@@ -53,15 +49,13 @@ services:
     environment:
       - SERVICE_TYPE=storage
       - PORT=5003
-      - MASTER_URL=http://master:5000
+      - MASTER_URL=${MASTER_URL:-http://master:5000}
       - NODE_IP=${NODE_IP:-127.0.0.1}
       - NODE_REGISTRATION_KEY=${NODE_REGISTRATION_KEY:-default_cluster_secret}
     ports:
       - "5003:5003"
     volumes:
       - ./data/storage3:/app/data_5003
-    depends_on:
-      - master
     networks:
       - drive-net
 

@@ -74,10 +74,10 @@ def delete_file(filename):
 
 def register_self():
     master_url = os.environ.get('MASTER_URL')
-    public_host = os.environ.get('PUBLIC_HOST')
+    node_ip = os.environ.get('NODE_IP')
     node_key = os.environ.get('NODE_REGISTRATION_KEY', 'default_cluster_secret')
     
-    if not master_url or not public_host:
+    if not master_url or not node_ip:
         return
         
     import time
@@ -85,12 +85,12 @@ def register_self():
     
     time.sleep(5) # Wait for server to start
     
-    # Address accessible by User Browser
-    public_address = f"http://{public_host}:{port}"
+    # Address accessible by Master and Users on the LAN
+    lan_address = f"http://{node_ip}:{port}"
     
     payload = {
         'name': f"Node_{port}",
-        'address': public_address,
+        'address': lan_address,
         'node_key': node_key
     }
     
@@ -99,7 +99,7 @@ def register_self():
         try:
             resp = requests.post(f"{master_url}/api/register_node", json=payload)
             if resp.status_code == 200:
-                print(f"Successfully registered as {public_address}")
+                print(f"Successfully registered as {lan_address}")
                 break
             else:
                 print(f"Registration rejected: {resp.text}")

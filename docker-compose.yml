@@ -20,7 +20,7 @@ services:
       - SERVICE_TYPE=storage
       - PORT=5001
       - MASTER_URL=http://master:5000
-      - PUBLIC_HOST=${PUBLIC_HOST:-localhost}
+      - NODE_IP=${NODE_IP:-127.0.0.1}
       - NODE_REGISTRATION_KEY=${NODE_REGISTRATION_KEY:-default_cluster_secret}
     ports:
       - "5001:5001"
@@ -37,7 +37,7 @@ services:
       - SERVICE_TYPE=storage
       - PORT=5002
       - MASTER_URL=http://master:5000
-      - PUBLIC_HOST=${PUBLIC_HOST:-localhost}
+      - NODE_IP=${NODE_IP:-127.0.0.1}
       - NODE_REGISTRATION_KEY=${NODE_REGISTRATION_KEY:-default_cluster_secret}
     ports:
       - "5002:5002"
@@ -54,7 +54,7 @@ services:
       - SERVICE_TYPE=storage
       - PORT=5003
       - MASTER_URL=http://master:5000
-      - PUBLIC_HOST=${PUBLIC_HOST:-localhost}
+      - NODE_IP=${NODE_IP:-127.0.0.1}
       - NODE_REGISTRATION_KEY=${NODE_REGISTRATION_KEY:-default_cluster_secret}
     ports:
       - "5003:5003"

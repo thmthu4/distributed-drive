@@ -7,6 +7,8 @@ import datetime
 import uuid
 import hashlib
 import mimetypes
+import threading
+import time
 from models import get_db_connection, init_db
 
 app = Flask(__name__)
@@ -39,6 +41,27 @@ def generate_token(action, expires_in=300):
         'exp': datetime.datetime.utcnow() + datetime.timedelta(seconds=expires_in)
     }
     return jwt.encode(payload, app.secret_key, algorithm='HS256')
+
+def monitor_nodes():
+    """Background thread to mark nodes as offline if they haven't sent a heartbeat recently."""
+    while True:
+        try:
+            conn = get_db_connection()
+            # Mark inactive if no heartbeat in last 60 seconds (allows for some network jitter)
+            conn.execute('''
+                UPDATE storage_nodes 
+                SET status = 'offline' 
+                WHERE status = 'active' AND last_heartbeat < datetime('now', '-60 seconds')
+            ''')
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"Error in node monitor: {e}")
+        time.sleep(30) # Run check every 30 seconds
+
+# Start the background monitor 
+monitor_thread = threading.Thread(target=monitor_nodes, daemon=True)
+monitor_thread.start()
 
 @app.route('/')
 def index():
@@ -443,7 +466,11 @@ def register_node():
         
     conn = get_db_connection()
     try:
-        conn.execute('INSERT INTO storage_nodes (name, address) VALUES (?, ?) ON CONFLICT(address) DO UPDATE SET last_heartbeat=CURRENT_TIMESTAMP', (name, address))
+        conn.execute('''
+            INSERT INTO storage_nodes (name, address, status, last_heartbeat) 
+            VALUES (?, ?, 'active', CURRENT_TIMESTAMP) 
+            ON CONFLICT(address) DO UPDATE SET last_heartbeat=CURRENT_TIMESTAMP, status='active'
+        ''', (name, address))
         conn.commit()
     except Exception as e:
         return jsonify({'error': str(e)}), 500

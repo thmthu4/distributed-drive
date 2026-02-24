@@ -22,10 +22,18 @@
         </thead>
         <tbody>
             {% for node in nodes %}
-            <tr>
-                <td>{{ node.name }}</td>
+            <tr style="{{ 'opacity: 0.5; background-color: #f9fafb;' if node.status == 'offline' else '' }}">
+                <td>
+                    {{ node.name }}
+                    {% if node.status == 'offline' %}
+                    <span
+                        style="font-size: 0.75rem; background-color: #fee2e2; color: #991b1b; padding: 2px 6px; border-radius: 9999px; margin-left: 8px;">Offline</span>
+                    {% endif %}
+                </td>
                 <td>{{ node.address }}</td>
-                <td><span style="color: {{ 'green' if node.status == 'active' else 'red' }}">{{ node.status }}</span>
+                <td><span
+                        style="color: {{ 'var(--success-color)' if node.status == 'active' else 'var(--danger-color)' }}; font-weight: 500;">{{
+                        node.status | title }}</span>
                 </td>
                 <td class="local-time" data-utc="{{ node.last_heartbeat }}">{{ node.last_heartbeat }}</td>
             </tr>

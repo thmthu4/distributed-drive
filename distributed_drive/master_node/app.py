@@ -165,11 +165,15 @@ def upload_file():
     
     total_size = 0
     sequence = 0
+    print(f"DEBUG: Starting upload for {file.filename} (file_id: {file_id})")
     
     try:
         while True:
             chunk_data = file.read(CHUNK_SIZE)
+            chunk_len = len(chunk_data)
+            print(f"DEBUG: Read chunk {sequence}: {chunk_len} bytes")
             if not chunk_data:
+                print(f"DEBUG: End of file reached for sequence {sequence}")
                 break
             
             chunk_hash = hashlib.sha256(chunk_data).hexdigest()
@@ -208,8 +212,10 @@ def upload_file():
                     last_error = str(e)
             
             if successful_replicas == 0:
+                print(f"ERROR: Failed to upload chunk {sequence} to ANY node. Last error: {last_error}")
                 raise Exception(f"Failed to upload chunk {sequence} to ANY node. Last error: {last_error}")
                 
+            print(f"DEBUG: Successfully pushed chunk {sequence} to {successful_replicas} nodes.")
             conn.commit() # Commit each chunk
             
             sequence += 1
@@ -267,6 +273,7 @@ def generate_file_stream(file_id):
     for seq in sorted(replicas_by_seq.keys()):
         replicas = replicas_by_seq[seq]
         success = False
+        print(f"DEBUG: Starting download for chunk seq {seq} (Replicas: {len(replicas)})")
         
         for chunk in replicas:
             url = f"{chunk['address']}/download/{chunk['chunk_id']}?token={token}"
@@ -285,7 +292,9 @@ def generate_file_stream(file_id):
                 if expected_hash:
                     actual_hash = hashlib.sha256(chunk_buffer).hexdigest()
                     if actual_hash != expected_hash:
+                        print(f"ERROR: Integrity check failed for chunk {chunk['chunk_id']}")
                         raise Exception(f"Integrity check failed for {chunk['chunk_id']}")
+                    print(f"DEBUG: Successfully verified and yielding {len(chunk_buffer)} bytes for sequence {seq}")
                     yield bytes(chunk_buffer)
                     
                 success = True

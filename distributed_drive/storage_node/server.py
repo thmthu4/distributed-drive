@@ -3,6 +3,9 @@ import os
 import sys
 import jwt
 import functools
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Configuration
 SECRET_KEY = 'supersecretkey'  # Must match Master Node
@@ -78,6 +81,9 @@ def register_self():
     node_key = os.environ.get('NODE_REGISTRATION_KEY', 'default_cluster_secret')
     
     if not master_url or not node_ip:
+        print(f"CRITICAL ERROR: Skipping Registration. Missing either MASTER_URL or NODE_IP!")
+        print(f"  > MASTER_URL = {master_url}")
+        print(f"  > NODE_IP = {node_ip}")
         return
         
     import time
@@ -109,10 +115,9 @@ def register_self():
         time.sleep(30)
 
 if __name__ == '__main__':
-    # Start registration in background if env vars exist
-    if os.environ.get('MASTER_URL'):
-        import threading
-        threading.Thread(target=register_self, daemon=True).start()
+    # Start registration in background
+    import threading
+    threading.Thread(target=register_self, daemon=True).start()
 
     print(f"Starting Storage Node on port {port}...")
     app.run(host='0.0.0.0', port=port, debug=True)

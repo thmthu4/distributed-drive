@@ -5,10 +5,31 @@
     <h2>File Shared Successfully!</h2>
     <p>Share this link with anyone (logged in or not):</p>
 
-    <div style="background: #f0f0f0; padding: 1rem; margin: 1rem 0; word-break: break-all; border-radius: 5px;">
-        <a href="{{ link }}" target="_blank">{{ link }}</a>
+    <div
+        style="background: #f0f0f0; padding: 1rem; margin: 1rem 0; word-break: break-all; border-radius: 5px; display: flex; align-items: center; justify-content: space-between; gap: 1rem; text-align: left;">
+        <a href="{{ link }}" id="share-link" target="_blank" style="flex-grow: 1;">{{ link }}</a>
+        <button onclick="copyToClipboard()" id="copy-btn" class="btn btn-sm" style="white-space: nowrap;">📋 Copy
+            Link</button>
     </div>
 
-    <a href="{{ url_for('dashboard') }}" class="btn">Back to Dashboard</a>
+    <a href="{{ url_for('dashboard') }}" class="btn" style="background-color: var(--secondary-color);">Back to My
+        Drive</a>
 </div>
+
+<script>
+    function copyToClipboard() {
+        const linkText = document.getElementById('share-link').innerText;
+        navigator.clipboard.writeText(linkText).then(() => {
+            const btn = document.getElementById('copy-btn');
+            btn.innerHTML = '✅ Copied!';
+            btn.style.backgroundColor = 'var(--success-color)';
+            setTimeout(() => {
+                btn.innerHTML = '📋 Copy Link';
+                btn.style.backgroundColor = '';
+            }, 3000);
+        }).catch(err => {
+            alert('Failed to copy link: ' + err);
+        });
+    }
+</script>
 {% endblock %}

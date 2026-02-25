@@ -9,12 +9,26 @@
 <div class="upload-card">
     <div class="upload-icon">⬆️</div>
     <h2>Upload New File</h2>
-    <form action="{{ url_for('upload_file') }}" method="POST" enctype="multipart/form-data" class="upload-form">
+    <form id="upload-form" action="{{ url_for('upload_file') }}" method="POST" enctype="multipart/form-data"
+        class="upload-form">
         <div class="file-input-wrapper">
             <input type="file" name="file" id="file-upload" required>
             <label for="file-upload" class="file-label">Choose a file or drag it here</label>
         </div>
-        <button type="submit" class="btn btn-large">Upload to Network</button>
+
+        <!-- Progress Bar Container (Hidden by default) -->
+        <div id="progress-container" style="display: none; margin-top: 1rem;">
+            <div
+                style="width: 100%; background-color: var(--border-color); border-radius: var(--radius); overflow: hidden;">
+                <div id="progress-bar"
+                    style="width: 0%; height: 8px; background-color: var(--primary-color); transition: width 0.2s;">
+                </div>
+            </div>
+            <p id="progress-text" style="font-size: 0.85rem; color: var(--text-light); margin-top: 0.5rem;">Uploading...
+                0%</p>
+        </div>
+
+        <button type="submit" id="upload-btn" class="btn btn-large">Upload to Network</button>
     </form>
 </div>
 
@@ -55,6 +69,11 @@
         const fileInput = document.getElementById('file-upload');
         const fileLabel = document.querySelector('.file-label');
         const originalText = fileLabel.textContent;
+        const form = document.getElementById('upload-form');
+        const progressContainer = document.getElementById('progress-container');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        const uploadBtn = document.getElementById('upload-btn');
 
         fileInput.addEventListener('change', (e) => {
             if (e.target.files.length > 0) {
@@ -69,6 +88,62 @@
                 fileLabel.style.backgroundColor = 'var(--surface-color)';
             }
         });
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault(); // Stop normal form submit
+
+            if (fileInput.files.length === 0) return;
+
+            // Show UI Loading State
+            progressContainer.style.display = 'block';
+            uploadBtn.disabled = true;
+            uploadBtn.style.opacity = '0.5';
+            uploadBtn.textContent = 'Uploading...';
+
+            const formData = new FormData(form);
+            const xhr = new XMLHttpRequest();
+
+            xhr.open('POST', form.action, true);
+
+            // Track upload progress
+            xhr.upload.onprogress = function (event) {
+                if (event.lengthComputable) {
+                    const percentComplete = Math.round((event.loaded / event.total) * 100);
+                    progressBar.style.width = percentComplete + '%';
+                    progressText.textContent = `Uploading... ${percentComplete}%`;
+
+                    if (percentComplete === 100) {
+                        progressText.textContent = 'Processing chunks and distributing to network...';
+                    }
+                }
+            };
+
+            // Handle response
+            xhr.onload = function () {
+                if (xhr.status === 200 || xhr.status === 302) {
+                    // Success! Refresh the page to show the new file
+                    window.location.reload();
+                } else {
+                    alert('Upload failed: ' + xhr.responseText);
+                    resetUI();
+                }
+            };
+
+            xhr.onerror = function () {
+                alert('Network error occurred during upload.');
+                resetUI();
+            };
+
+            xhr.send(formData);
+        });
+
+        function resetUI() {
+            progressContainer.style.display = 'none';
+            progressBar.style.width = '0%';
+            uploadBtn.disabled = false;
+            uploadBtn.style.opacity = '1';
+            uploadBtn.textContent = 'Upload to Network';
+        }
     });
 </script>
 {% endblock %}

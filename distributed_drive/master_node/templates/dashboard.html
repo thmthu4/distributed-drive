@@ -49,4 +49,26 @@
     <p>No files uploaded yet.</p>
     {% endif %}
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const fileInput = document.getElementById('file-upload');
+        const fileLabel = document.querySelector('.file-label');
+        const originalText = fileLabel.textContent;
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                fileLabel.textContent = 'Selected: ' + e.target.files[0].name;
+                fileLabel.style.color = 'var(--primary-color)';
+                fileLabel.style.borderColor = 'var(--primary-color)';
+                fileLabel.style.backgroundColor = 'rgba(79, 70, 229, 0.05)';
+            } else {
+                fileLabel.textContent = originalText;
+                fileLabel.style.color = 'var(--text-light)';
+                fileLabel.style.borderColor = 'var(--border-color)';
+                fileLabel.style.backgroundColor = 'var(--surface-color)';
+            }
+        });
+    });
+</script>
 {% endblock %}

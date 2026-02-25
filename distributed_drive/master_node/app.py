@@ -379,7 +379,12 @@ def share_file(file_id):
 @app.route('/shared/<int:file_id>')
 def shared_file_view(file_id):
     conn = get_db_connection()
-    file = conn.execute('SELECT * FROM files WHERE id = ?', (file_id,)).fetchone()
+    file = conn.execute('''
+        SELECT f.*, u.username as owner_name 
+        FROM files f 
+        JOIN users u ON f.user_id = u.id 
+        WHERE f.id = ?
+    ''', (file_id,)).fetchone()
     conn.close()
     if not file:
         return "File not found or link expired."
